@@ -13,9 +13,16 @@ raccoon_data/
 output_model/
 *.pt
 *.pth
+*.onnx
 
 # Generated images
 raccoon.png
+
+# Interactive build artifacts (rebuilt with build_interactive.py / export_onnx.py)
+assets/interactive/
+
+# Local scratch
+_more_raccoons.py
 
 # IDE
 .idea/
@@ -26,3 +33,6 @@ raccoon.png
 # OS
 .DS_Store
 Thumbs.db
+
+# Tooling
+.claude/
