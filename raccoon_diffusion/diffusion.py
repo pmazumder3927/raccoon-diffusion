@@ -3,15 +3,28 @@ DDPM diffusion utilities.
 Implements noise scheduling, forward diffusion, and sampling.
 """
 
+import math
+
 import torch
 import torch.nn.functional as F
+
+
+def _cosine_betas(timesteps, s=0.008):
+    """Cosine beta schedule from Nichol & Dhariwal (Improved DDPM)."""
+    steps = timesteps + 1
+    t = torch.linspace(0, timesteps, steps) / timesteps
+    alphas_cumprod = torch.cos((t + s) / (1 + s) * math.pi * 0.5) ** 2
+    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+    betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+    return torch.clip(betas, 1e-5, 0.999)
 
 
 class GaussianDiffusion:
     """
     Gaussian Diffusion process for DDPM.
 
-    Uses a linear beta schedule by default, which works well for small images.
+    Supports linear or cosine beta schedule. Cosine produces noticeably better
+    samples for natural images at low resolution.
     """
 
     def __init__(
@@ -19,13 +32,18 @@ class GaussianDiffusion:
         timesteps=1000,
         beta_start=1e-4,
         beta_end=0.02,
+        schedule="cosine",
         device="cpu",
     ):
         self.timesteps = timesteps
         self.device = device
+        self.schedule = schedule
 
-        # Linear beta schedule
-        self.betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+        if schedule == "cosine":
+            self.betas = _cosine_betas(timesteps).to(device)
+        else:
+            self.betas = torch.linspace(beta_start, beta_end, timesteps, device=device)
+
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
         self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
@@ -124,7 +142,7 @@ class GaussianDiffusion:
         return x
 
     @torch.no_grad()
-    def sample_ddim(self, model, shape, seed=None, steps=50):
+    def sample_ddim(self, model, shape, seed=None, steps=50, return_trajectory=False):
         """
         DDIM sampling for faster generation.
 
@@ -133,9 +151,11 @@ class GaussianDiffusion:
             shape: (batch_size, channels, height, width)
             seed: Random seed for reproducibility
             steps: Number of sampling steps (fewer = faster)
+            return_trajectory: If True, also return a list of intermediate x_t tensors
+                (one per step, useful for visualizing the denoising trajectory)
 
         Returns:
-            Generated images in [-1, 1] range
+            Generated images in [-1, 1] range, optionally also the trajectory
         """
         if seed is not None:
             torch.manual_seed(seed)
@@ -150,6 +170,7 @@ class GaussianDiffusion:
 
         # Start from pure noise
         x = torch.randn(shape, device=device)
+        trajectory = [x.clone().cpu()] if return_trajectory else None
 
         for i, t in enumerate(timesteps):
             t_batch = torch.full((batch_size,), t, device=device, dtype=torch.long)
@@ -177,4 +198,9 @@ class GaussianDiffusion:
             # DDIM step (deterministic)
             x = torch.sqrt(alpha_cumprod_prev) * pred_x0 + dir_xt
 
+            if return_trajectory:
+                trajectory.append(x.clone().cpu())
+
+        if return_trajectory:
+            return x, trajectory
         return x
