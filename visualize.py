@@ -25,11 +25,65 @@ import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib import font_manager
 from PIL import Image
 from torchvision.utils import make_grid
 
 from raccoon_diffusion.diffusion import GaussianDiffusion
 from raccoon_diffusion.model import TinyUNet
+
+
+# pramit.gg brand tokens
+BG = "#0a0a0a"           # charcoal-black
+SURFACE = "#141414"
+TEXT = "#ffffffe6"        # white / 90
+TEXT_MUTED = "#ffffff80"  # white / 50
+GRID = "#ffffff14"        # white / 8
+ACCENT = "#ff6b3d"        # accent-orange
+ACCENT_SOFT = "#ff6b3d99"
+SECONDARY = "#7c77c6"     # accent-purple
+
+_FONTS_LOADED = False
+
+
+def _load_fonts():
+    global _FONTS_LOADED
+    if _FONTS_LOADED:
+        return
+    fonts_dir = Path(__file__).parent / ".fonts"
+    for fp in fonts_dir.glob("*.ttf"):
+        try:
+            font_manager.fontManager.addfont(str(fp))
+        except Exception:
+            pass
+    _FONTS_LOADED = True
+
+
+def _apply_brand_style():
+    _load_fonts()
+    plt.rcParams.update({
+        "font.family": ["Inter", "Helvetica", "Arial", "DejaVu Sans"],
+        "font.size": 11,
+        "axes.titlesize": 16,
+        "axes.titleweight": "regular",
+        "axes.labelsize": 11,
+        "axes.labelcolor": TEXT_MUTED,
+        "axes.edgecolor": GRID,
+        "axes.linewidth": 0.8,
+        "xtick.color": TEXT_MUTED,
+        "ytick.color": TEXT_MUTED,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "text.color": TEXT,
+        "figure.facecolor": BG,
+        "axes.facecolor": BG,
+        "savefig.facecolor": BG,
+        "grid.color": GRID,
+        "grid.linewidth": 0.6,
+        "legend.facecolor": SURFACE,
+        "legend.edgecolor": GRID,
+        "legend.labelcolor": TEXT,
+    })
 
 
 def get_device():
@@ -41,44 +95,50 @@ def get_device():
 
 
 def plot_loss(history_path: Path, out_path: Path):
+    _apply_brand_style()
     with open(history_path) as f:
         history = json.load(f)
 
     step_loss = np.array(history["step_loss"])
     epoch_loss = np.array(history["epoch_loss"])
 
-    fig, ax = plt.subplots(figsize=(10, 5), facecolor="#0d1117")
-    ax.set_facecolor("#0d1117")
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    # Per-step loss in light grey, downsampled if very long
     steps = np.arange(len(step_loss))
     if len(steps) > 4000:
-        # Moving-average smoothing for readability
         k = max(1, len(steps) // 2000)
         smoothed = np.convolve(step_loss, np.ones(k) / k, mode="valid")
-        ax.plot(steps[: len(smoothed)], smoothed, color="#6e7681", alpha=0.6,
-                linewidth=0.8, label="step loss (smoothed)")
+        ax.plot(steps[: len(smoothed)], smoothed, color=TEXT_MUTED, alpha=0.45,
+                linewidth=0.9, label="step loss")
     else:
-        ax.plot(steps, step_loss, color="#6e7681", alpha=0.5,
+        ax.plot(steps, step_loss, color=TEXT_MUTED, alpha=0.4,
                 linewidth=0.6, label="step loss")
 
-    # Per-epoch loss on top, positioned at last step of each epoch
     if len(epoch_loss) > 0:
         steps_per_epoch = max(1, len(step_loss) // len(epoch_loss))
         epoch_x = np.arange(1, len(epoch_loss) + 1) * steps_per_epoch
-        ax.plot(epoch_x, epoch_loss, color="#58a6ff", linewidth=2.2,
-                label="epoch avg", marker="o", markersize=3)
+        ax.plot(epoch_x, epoch_loss, color=ACCENT, linewidth=2.2,
+                label="epoch avg", marker="o", markersize=2.5,
+                markerfacecolor=ACCENT, markeredgewidth=0)
 
-    ax.set_xlabel("training step", color="#c9d1d9")
-    ax.set_ylabel("MSE loss", color="#c9d1d9")
-    ax.set_title("Raccoon diffusion training loss", color="#c9d1d9", fontsize=14)
-    ax.tick_params(colors="#c9d1d9")
-    for spine in ax.spines.values():
-        spine.set_color("#30363d")
-    ax.grid(True, alpha=0.15, color="#c9d1d9")
-    ax.legend(facecolor="#161b22", edgecolor="#30363d", labelcolor="#c9d1d9")
+    ax.set_xlabel("training step")
+    ax.set_ylabel("MSE loss")
+    ax.set_title("Training loss", loc="left",
+                 fontfamily="Instrument Serif", fontsize=22, color=TEXT,
+                 pad=14)
+    for side, spine in ax.spines.items():
+        spine.set_color(GRID)
+        if side in ("top", "right"):
+            spine.set_visible(False)
+    ax.grid(True, axis="y", linewidth=0.5, color=GRID)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    leg = ax.legend(loc="upper right", frameon=False, fontsize=9)
+    for text in leg.get_texts():
+        text.set_color(TEXT_MUTED)
+
     fig.tight_layout()
-    fig.savefig(out_path, dpi=130, facecolor=fig.get_facecolor())
+    fig.savefig(out_path, dpi=140, facecolor=BG)
     plt.close(fig)
     print(f"  wrote {out_path}")
 
@@ -96,19 +156,26 @@ def _read_epoch_samples(samples_dir: Path):
 
 
 def _annotate(img: Image.Image, text: str) -> Image.Image:
-    """Add a small epoch label to the top-left of a sample grid."""
+    """Add a brand-styled epoch tag to the top-left of a sample grid."""
     from PIL import ImageDraw, ImageFont
 
     img = img.copy()
     draw = ImageDraw.Draw(img)
+    font_path = Path(__file__).parent / ".fonts" / "JetBrainsMono.ttf"
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+        font = ImageFont.truetype(str(font_path), 13)
     except OSError:
-        font = ImageFont.load_default()
-    pad = 6
-    bbox = draw.textbbox((pad, pad), text, font=font)
-    draw.rectangle([bbox[0] - 4, bbox[1] - 2, bbox[2] + 4, bbox[3] + 2], fill=(0, 0, 0, 220))
-    draw.text((pad, pad), text, fill=(255, 255, 255), font=font)
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 13)
+        except OSError:
+            font = ImageFont.load_default()
+    pad_x, pad_y = 10, 6
+    bbox = draw.textbbox((pad_x, pad_y), text, font=font)
+    # Soft charcoal pill, accent-orange left edge
+    bg_box = [bbox[0] - 8, bbox[1] - 4, bbox[2] + 8, bbox[3] + 4]
+    draw.rectangle(bg_box, fill=(10, 10, 10, 230))
+    draw.rectangle([bg_box[0], bg_box[1], bg_box[0] + 2, bg_box[3]], fill=(255, 107, 61, 255))
+    draw.text((pad_x, pad_y), text, fill=(255, 255, 255, 235), font=font)
     return img
 
 
@@ -151,9 +218,10 @@ def make_evolution_strip(samples_dir: Path, out_path: Path, n_picks: int = 6):
 
     annotated = [_annotate(img, f"epoch {e}") for e, img in picks]
     w, h = annotated[0].size
-    strip = Image.new("RGB", (w * len(annotated), h), color=(13, 17, 23))
+    strip = Image.new("RGB", (w * len(annotated) + 2 * (len(annotated) - 1), h),
+                       color=(10, 10, 10))  # charcoal-black gutters
     for i, img in enumerate(annotated):
-        strip.paste(img, (i * w, 0))
+        strip.paste(img, (i * (w + 2), 0))
     strip.save(out_path)
     print(f"  wrote {out_path}")
 
@@ -178,7 +246,7 @@ def make_denoising_gif(model_path: Path, out_path: Path, device, img_size=64,
     frames = []
     for x in trajectory:
         x = ((x + 1) / 2).clamp(0, 1)
-        grid = make_grid(x, nrow=batch, padding=2, pad_value=0.05)
+        grid = make_grid(x, nrow=batch, padding=2, pad_value=10/255)
         arr = (grid.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
         img = Image.fromarray(arr)
         if upscale != 1:
@@ -202,7 +270,7 @@ def make_final_grid(model_path: Path, out_path: Path, device, img_size=64,
         x = diffusion.sample_ddim(model, shape=(n, 3, img_size, img_size),
                                   seed=seed, steps=steps)
     x = ((x + 1) / 2).clamp(0, 1).cpu()
-    grid = make_grid(x, nrow=int(n ** 0.5), padding=2, pad_value=0.05)
+    grid = make_grid(x, nrow=int(n ** 0.5), padding=3, pad_value=10/255)
     arr = (grid.permute(1, 2, 0).numpy() * 255).astype(np.uint8)
     img = Image.fromarray(arr)
     # Upscale for crispness in the README

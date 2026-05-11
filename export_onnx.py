@@ -24,22 +24,60 @@ from raccoon_diffusion.model import TinyUNet
 
 
 VIEWER_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --border: rgba(255,255,255,0.08);
+  --text: rgba(255,255,255,0.9);
+  --muted: rgba(255,255,255,0.5);
+  --accent: #ff6b3d;
+  --accent-soft: rgba(255,107,61,0.18);
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                            Roboto, Helvetica, Arial, sans-serif;
-       background: #0d1117; color: #c9d1d9; padding: 16px;
-       display: flex; flex-direction: column; align-items: center; gap: 12px; }
-canvas#out { image-rendering: pixelated; border-radius: 6px;
-             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-             width: 384px; height: 384px; background: #161b22; }
-.row { display: flex; gap: 12px; align-items: center; }
-.meta { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #8b949e; }
-button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
-         padding: 8px 16px; border-radius: 6px; cursor: pointer; font: inherit; }
-button:hover:not(:disabled) { background: #30363d; }
-button:disabled { opacity: 0.5; cursor: default; }
-input[type=number] { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
-                     padding: 4px 8px; border-radius: 4px; font: inherit; width: 100px; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text);
+       font-family: var(--sans); font-size: 14px;
+       padding: 28px;
+       display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+h2 { font-family: var(--serif); font-weight: 400;
+     font-size: clamp(24px, 4vw, 34px);
+     letter-spacing: -0.01em; margin: 0; }
+
+canvas#out { image-rendering: pixelated; border-radius: 10px;
+             width: 384px; height: 384px; background: #050505;
+             box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset,
+                         0 20px 40px -16px rgba(0,0,0,0.6); }
+
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+       justify-content: center; }
+
+.meta { font-family: var(--mono); font-size: 12px;
+        color: var(--muted); letter-spacing: 0.01em; }
+
+button { background: transparent; border: 1px solid var(--border); color: var(--text);
+         padding: 8px 16px; border-radius: 999px; cursor: pointer;
+         font: 500 13px var(--sans); letter-spacing: 0.01em;
+         transition: 0.18s ease; }
+button:hover:not(:disabled) { border-color: var(--accent);
+                              color: var(--accent); background: var(--accent-soft); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+button.primary { background: var(--accent); border-color: var(--accent);
+                 color: #0a0a0a; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: #ff8559; border-color: #ff8559;
+                                       color: #0a0a0a; }
+
+input[type=number] { background: transparent; border: 1px solid var(--border);
+                     color: var(--text); padding: 6px 10px; border-radius: 6px;
+                     font: 500 13px var(--mono); width: 130px; }
+input[type=number]:focus { outline: none; border-color: var(--accent); }
 """
 
 
@@ -48,16 +86,17 @@ INFERENCE_HTML = """<!doctype html><html><head>
 <style>__CSS__</style>
 <script src='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js'></script>
 </head><body>
-<h2 style='margin:0'>Generate a raccoon, live in your browser</h2>
+<h2>generate a raccoon, live in your browser</h2>
 <canvas id='out' width='64' height='64'></canvas>
 <div class='row'>
-  seed <input id='seed' type='number' value='0'/>
-  <button id='go' disabled>generating…</button>
-  <button id='rand'>random seed</button>
+  <span class='meta'>seed</span>
+  <input id='seed' type='number' value='0'/>
+  <button id='go' class='primary' disabled>loading…</button>
+  <button id='rand'>random</button>
 </div>
 <div class='meta'>
-  steps: <input id='steps' type='number' value='25' min='5' max='200'/>
-  <span id='status'>loading model…</span>
+  steps <input id='steps' type='number' value='25' min='5' max='200'/>
+  &nbsp;·&nbsp; <span id='status'>fetching model…</span>
 </div>
 <script>
 const TIMESTEPS = 1000;
@@ -116,7 +155,7 @@ async function init() {
     { executionProviders: ['wasm'] });
   document.getElementById('go').disabled = false;
   document.getElementById('go').textContent = 'generate';
-  document.getElementById('status').textContent = 'model loaded';
+  document.getElementById('status').textContent = 'ready';
 }
 
 async function generate() {

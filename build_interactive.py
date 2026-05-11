@@ -181,26 +181,92 @@ def build_epoch_grids(samples_dir: Path, out_dir: Path):
 # ---- HTML viewers --------------------------------------------------------
 
 VIEWER_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0a0a0a;            /* charcoal-black */
+  --surface: #141414;
+  --border: rgba(255,255,255,0.08);
+  --text: rgba(255,255,255,0.9);
+  --muted: rgba(255,255,255,0.5);
+  --accent: #ff6b3d;        /* accent-orange */
+  --accent-soft: rgba(255,107,61,0.18);
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+}
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                            Roboto, Helvetica, Arial, sans-serif;
-       background: #0d1117; color: #c9d1d9; padding: 16px;
-       display: flex; flex-direction: column; align-items: center; gap: 12px; }
-canvas, img.frame { image-rendering: pixelated; border-radius: 6px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-.row { display: flex; gap: 12px; align-items: center; }
-.meta { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #8b949e; }
-button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
-         padding: 6px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
-button:hover { background: #30363d; }
-button:disabled { opacity: 0.5; cursor: default; }
-input[type=range] { width: 360px; accent-color: #58a6ff; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text);
+       font-family: var(--sans); font-size: 14px;
+       padding: 24px;
+       display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+h2 { font-family: var(--serif); font-weight: 400;
+     font-size: clamp(24px, 4vw, 34px);
+     letter-spacing: -0.01em; margin: 0; color: var(--text); }
+
+canvas, img.frame { image-rendering: pixelated; border-radius: 8px;
+                    background: #050505;
+                    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset,
+                                0 20px 40px -16px rgba(0,0,0,0.6); }
+
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+       justify-content: center; }
+
+.meta { font-family: var(--mono); font-size: 12px;
+        color: var(--muted); letter-spacing: 0.01em; }
+.meta b, .meta strong { color: var(--text); font-weight: 500; }
+
+button { background: transparent; border: 1px solid var(--border); color: var(--text);
+         padding: 7px 14px; border-radius: 999px; cursor: pointer;
+         font: 500 13px var(--sans); letter-spacing: 0.01em;
+         transition: 0.18s ease; }
+button:hover:not(:disabled) { border-color: var(--accent);
+                              color: var(--accent); background: var(--accent-soft); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+input[type=range] { -webkit-appearance: none; appearance: none;
+                    width: min(420px, 86vw); height: 22px;
+                    background: transparent; accent-color: var(--accent); }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 2px; background: var(--border); border-radius: 999px;
+}
+input[type=range]::-moz-range-track {
+  height: 2px; background: var(--border); border-radius: 999px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 999px;
+  background: var(--accent); margin-top: -6px;
+  box-shadow: 0 0 0 4px rgba(255,107,61,0.18);
+}
+input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255,107,61,0.18);
+}
+
+input[type=number] { background: transparent; border: 1px solid var(--border);
+                     color: var(--text); padding: 5px 10px; border-radius: 6px;
+                     font: 500 13px var(--mono); width: 110px; }
+input[type=number]:focus { outline: none; border-color: var(--accent); }
+
 .grid { display: grid; gap: 4px; grid-template-columns: repeat(8, 1fr); }
 .grid img { width: 100%; cursor: pointer; image-rendering: pixelated;
-            border-radius: 4px; border: 2px solid transparent; transition: 0.15s; }
-.grid img:hover { border-color: #58a6ff; transform: scale(1.05); }
-.grid img.selected { border-color: #58a6ff; box-shadow: 0 0 0 2px #1f6feb; }
-h2 { font-weight: 600; margin: 0; font-size: 16px; color: #c9d1d9; }
+            border-radius: 4px; border: 1.5px solid transparent;
+            transition: 0.15s ease; opacity: 0.92; }
+.grid img:hover { border-color: var(--accent); transform: translateY(-1px);
+                  opacity: 1; }
+.grid img.selected { border-color: var(--accent);
+                     box-shadow: 0 0 0 2px rgba(255,107,61,0.35);
+                     opacity: 1; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-decoration-color: rgba(255,107,61,0.5); }
+ul { padding-left: 20px; }
+li { margin: 6px 0; }
 """
 
 
@@ -217,14 +283,14 @@ def write_html(out_dir: Path, name: str, title: str, body: str, script: str):
 
 def write_viewers(out_dir: Path):
     # Trajectory scrubber
-    write_html(out_dir, "trajectory.html", "Denoising trajectory",
+    write_html(out_dir, "trajectory.html", "denoising trajectory",
         """
         <img id='frame' class='frame' width='256' height='256'/>
         <input id='slider' type='range' min='0' max='0' value='0'/>
         <div class='row meta'>
           <span>step <span id='step'>0</span> / <span id='total'>0</span></span>
-          <button id='play'>▶ play</button>
-          <button id='reset'>↺ reset</button>
+          <button id='play' class='primary'>play</button>
+          <button id='reset'>reset</button>
         </div>
         """,
         """
@@ -246,8 +312,8 @@ def write_viewers(out_dir: Path):
           let playTimer = null;
           document.getElementById('play').onclick = () => {
             if (playTimer) { clearInterval(playTimer); playTimer = null;
-                              document.getElementById('play').textContent = '▶ play'; return; }
-            document.getElementById('play').textContent = '⏸ pause';
+                              document.getElementById('play').textContent = 'play'; return; }
+            document.getElementById('play').textContent = 'pause';
             let i = +slider.value;
             playTimer = setInterval(() => {
               i = (i + 1) % data.frames.length;
@@ -259,13 +325,13 @@ def write_viewers(out_dir: Path):
         """)
 
     # Epoch scrubber
-    write_html(out_dir, "epochs.html", "Training timeline",
+    write_html(out_dir, "epochs.html", "training timeline",
         """
         <img id='frame' class='frame' width='384' height='384'/>
         <input id='slider' type='range' min='0' max='0' value='0'/>
         <div class='row meta'>
           <span>epoch <span id='epoch'>0</span></span>
-          <button id='play'>▶ play</button>
+          <button id='play' class='primary'>play</button>
         </div>
         """,
         """
@@ -287,15 +353,15 @@ def write_viewers(out_dir: Path):
           let playTimer = null;
           document.getElementById('play').onclick = () => {
             if (playTimer) { clearInterval(playTimer); playTimer = null;
-                              document.getElementById('play').textContent = '▶ play'; return; }
-            document.getElementById('play').textContent = '⏸ pause';
+                              document.getElementById('play').textContent = 'play'; return; }
+            document.getElementById('play').textContent = 'pause';
             let i = 0; render(i);
             playTimer = setInterval(() => {
               i = (i + 1) % items.length;
               render(i);
               if (i === items.length - 1) {
                 clearInterval(playTimer); playTimer = null;
-                document.getElementById('play').textContent = '▶ play';
+                document.getElementById('play').textContent = 'play';
               }
             }, 100);
           };
@@ -303,7 +369,7 @@ def write_viewers(out_dir: Path):
         """)
 
     # Seed explorer
-    write_html(out_dir, "seeds.html", "Seed explorer",
+    write_html(out_dir, "seeds.html", "seed explorer",
         """
         <img id='zoom' class='frame' width='256' height='256'/>
         <div class='meta'>seed: <span id='seed'>0</span> · click a thumbnail to zoom</div>
@@ -332,7 +398,7 @@ def write_viewers(out_dir: Path):
         """)
 
     # Interpolation
-    write_html(out_dir, "interp.html", "Latent interpolation",
+    write_html(out_dir, "interp.html", "latent interpolation",
         """
         <img id='frame' class='frame' width='320' height='320'/>
         <input id='slider' type='range' min='0' max='0' value='0' step='1'/>
@@ -360,16 +426,17 @@ def write_viewers(out_dir: Path):
 
     # Index page that links everything
     (out_dir / "index.html").write_text(f"""<!doctype html><html><head>
-<meta charset='utf-8'><title>Raccoon diffusion · interactive</title>
+<meta charset='utf-8'><title>raccoon diffusion · interactive</title>
 <style>{VIEWER_CSS}</style></head><body>
-<h2>Raccoon diffusion · interactive demos</h2>
+<h2>raccoon diffusion</h2>
+<div class='meta'>interactive demos &nbsp;·&nbsp; standalone html, ready to iframe</div>
 <ul>
-  <li><a href='trajectory.html'>Denoising trajectory</a></li>
-  <li><a href='epochs.html'>Training timeline</a></li>
-  <li><a href='seeds.html'>Seed explorer</a></li>
-  <li><a href='interp.html'>Latent interpolation</a></li>
+  <li><a href='trajectory.html'>denoising trajectory</a> &nbsp;<span class='meta'>scrub 50 ddim steps</span></li>
+  <li><a href='epochs.html'>training timeline</a> &nbsp;<span class='meta'>watch raccoons emerge</span></li>
+  <li><a href='seeds.html'>seed explorer</a> &nbsp;<span class='meta'>64 raccoons, 64 seeds</span></li>
+  <li><a href='interp.html'>latent interpolation</a> &nbsp;<span class='meta'>slerp between two seeds</span></li>
+  <li><a href='inference.html'>live inference</a> &nbsp;<span class='meta'>onnx in your browser</span></li>
 </ul>
-<div class='meta'>Each page is standalone — drop the matching .json next to the .html and iframe.</div>
 </body></html>""")
 
 
